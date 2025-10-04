@@ -2,7 +2,7 @@
 
 ![](./diagram.png)
 
-A Rust-based REST API service that transforms Terraform state files into detailed FedRAMP-compliant architecture boundary diagrams using AI-enhanced Mermaid diagram generation.
+A Rust-based REST API service that transforms Terraform state files into detailed FedRAMP-aligned architecture boundary diagrams using AI-enhanced Mermaid diagram generation.
 
 ## Overview
 
