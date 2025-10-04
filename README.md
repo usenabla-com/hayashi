@@ -2,27 +2,29 @@
 
 ![](./diagram.png)
 
-A Rust-based diagramming-as-code API that allows you to turn your .tfstate file into detailed architecture boundary diagrams.
+A Rust-based REST API service that transforms Terraform state files into detailed FedRAMP-compliant architecture boundary diagrams using AI-enhanced Mermaid diagram generation.
 
 ## Overview
 
-Hayashi transforms Terraform state files into visual architecture diagrams with security and compliance boundaries. Perfect for creating documentation that meets FedRAMP, NIST 800-53, and other compliance framework requirements.
+Hayashi is a web service that parses Terraform state files and generates visual architecture diagrams with security and compliance boundaries. It leverages Cloudflare Workers AI to create human-friendly diagrams that meet FedRAMP, NIST 800-53, and other compliance framework requirements.
 
 ## Features
 
-- 🔄 **Automatic Diagram Generation**: Parse Terraform state files and generate Mermaid diagrams
-- 🔒 **Security Boundary Visualization**: Clearly delineate authorization boundaries and trust zones
-- 📋 **Compliance Controls**: Annotate resources with relevant security controls (SC-7, AU-2, AC-6, CM-2, etc.)
+- 🔄 **Automatic Diagram Generation**: Parse Terraform state files and generate Mermaid flowchart diagrams
+- 🔒 **Security Boundary Visualization**: Clearly delineate FedRAMP authorization boundaries and trust zones
+- 📋 **Compliance Controls**: Annotate resources with relevant NIST 800-53 controls (SC-7, AU-2, AC-6, CM-2, etc.)
 - 🏗️ **Architecture Tiers**: Automatically organize resources into public, application, and data tiers
-- 🎨 **Customizable Styling**: Color-coded boundaries and security zones
+- 🎨 **Smart Styling**: Color-coded boundaries and security zones with AWS service icons
+- 🤖 **AI-Enhanced**: Uses Cloudflare Workers AI to generate clean, readable diagrams
 
 ## Installation
 
-```bash
-cargo install hayashi
-```
+### Prerequisites
 
-Or build from source:
+- Rust 1.70+
+- Cloudflare account with Workers AI access
+
+### Build from Source
 
 ```bash
 git clone https://github.com/yourusername/hayashi.git
@@ -30,79 +32,106 @@ cd hayashi
 cargo build --release
 ```
 
-## Usage
-
-### Basic Usage
+### Environment Variables
 
 ```bash
-# Generate diagram from Terraform state
-hayashi generate terraform.tfstate -o diagram.mmd
-
-# Generate diagram with specific boundary name
-hayashi generate terraform.tfstate --boundary "FedRAMP Authorization Boundary" -o diagram.mmd
-
-# Output as SVG
-hayashi generate terraform.tfstate --format svg -o diagram.svg
+export CLOUDFLARE_ACCOUNT_ID="your-account-id"
+export CLOUDFLARE_API_TOKEN="your-api-token"
 ```
 
-### API Usage
+## Usage
 
-```rust
-use hayashi::{TerraformParser, DiagramGenerator};
+### Starting the API Server
 
-fn main() {
-    // Parse Terraform state
-    let state = TerraformParser::from_file("terraform.tfstate")?;
+```bash
+cargo run --release
+```
 
-    // Generate diagram
-    let diagram = DiagramGenerator::new()
-        .with_boundary_name("FedRAMP Authorization Boundary")
-        .with_compliance_controls(true)
-        .generate(&state)?;
+The API server will start on `http://0.0.0.0:3000`
 
-    // Save to file
-    diagram.save("output.mmd")?;
+### API Endpoint
+
+**POST** `/v1/diagram`
+
+Generate a Mermaid architecture diagram from a Terraform state file.
+
+#### Request Body
+
+```json
+{
+  "name": "Production Environment",
+  "statefile_path": "/path/to/terraform.tfstate",
+  "model": "@cf/openai/gpt-oss-120b",
+  "api_key": "optional-override-api-key"
 }
 ```
 
-### Configuration
+#### Parameters
 
-Create a `hayashi.toml` configuration file:
+- `name` (required): Title for the generated diagram
+- `statefile_path` (required): Path to the Terraform state file
+- `model` (optional): Cloudflare Workers AI model to use (defaults to `@cf/openai/gpt-oss-120b`)
+- `api_key` (optional): Override the default Cloudflare API token
 
-```toml
-[boundary]
-name = "FedRAMP Authorization Boundary"
-show_controls = true
+#### Response
 
-[styling]
-boundary_color = "#1976d2"
-public_tier_color = "#fbc02d"
-app_tier_color = "#2e7d32"
-data_tier_color = "#1565c0"
+```json
+{
+  "mermaid_content": "flowchart TB\n    ...",
+  "metadata": {
+    "generated_at": "2025-10-04T12:34:56Z",
+    "node_count": 25,
+    "edge_count": 18,
+    "title": "Production Environment"
+  }
+}
+```
 
-[resources]
-# Map resource types to tiers
-public_tier = ["aws_internet_gateway", "aws_nat_gateway", "aws_lb"]
-app_tier = ["aws_ecs_service", "aws_efs_file_system"]
-data_tier = ["aws_s3_bucket", "aws_sqs_queue", "aws_sns_topic"]
+### Example Usage with curl
+
+```bash
+curl -X POST http://localhost:3000/v1/diagram \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "FedRAMP Production Boundary",
+    "statefile_path": "./terraform.tfstate"
+  }'
 ```
 
 ## Supported Resources
 
-Hayashi supports a wide range of AWS resources including:
+Hayashi automatically categorizes and visualizes a wide range of AWS resources including:
 
-- **Networking**: VPC, Internet Gateway, NAT Gateway, Load Balancers
-- **Compute**: ECS, EKS, EC2, Lambda
+- **Networking**: VPC, Internet Gateway, NAT Gateway, Load Balancers, Security Groups, NACLs
+- **Compute**: ECS, EKS, EC2, Lambda, Auto Scaling Groups
 - **Storage**: S3, EFS, EBS
-- **Security**: KMS, Secrets Manager, Systems Manager Parameter Store
-- **Monitoring**: CloudTrail, GuardDuty, Config, CloudWatch
+- **Database**: RDS, DynamoDB, ElastiCache, DocumentDB, Neptune
+- **Security**: KMS, IAM, GuardDuty, Security Hub, WAF
+- **Monitoring**: CloudTrail, GuardDuty, Config, CloudWatch, VPC Flow Logs
 
-## Output Formats
+## How It Works
 
-- **Mermaid** (`.mmd`) - For GitHub, documentation sites, and Markdown files
-- **SVG** - For presentations and static documentation
-- **PNG** - For image embedding
-- **JSON** - For programmatic processing
+1. **State File Parsing**: Reads and parses Terraform state files to extract infrastructure resources
+2. **Resource Graph Building**: Constructs a directed graph of resources and their relationships
+3. **Trust Zone Classification**: Automatically categorizes resources into:
+   - Identity & Access Management plane
+   - Key Management plane
+   - Audit & Monitoring plane
+   - Network boundaries (VPCs with tiered subnets)
+   - External interfaces
+4. **Subnet Tier Detection**: Intelligently classifies subnets as Public, Private-App, Private-DB, or Management
+5. **AI Enhancement**: Sends the base diagram structure to Cloudflare Workers AI for human-friendly formatting
+6. **FedRAMP Compliance**: Adds NIST 800-53 control annotations, encryption labels, and authorization boundaries
+
+## Output Format
+
+The API returns Mermaid flowchart syntax with:
+- **FedRAMP Authorization Boundary** as the main container
+- **Trust zone subgraphs** (Security Services, VPCs, Network Tiers)
+- **AWS service icons** from icon.icepanel.io and cloudflare CDN
+- **Encryption annotations** (🔒 EBS-CMK, 🔒 KMS, etc.)
+- **NIST control references** (SC-7, AU-2, CM-2, etc.)
+- **Color-coded styling** for different security zones
 
 ## Contributing
 
